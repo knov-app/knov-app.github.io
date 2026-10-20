@@ -68,6 +68,9 @@ $$(".dl").forEach((a) => {
   const key = os === "win" ? "hero.dl.win" : os.startsWith("mac") ? "hero.dl.mac" : "hero.dl.any";
   onLang.push(() => ($(".os-label", btn).textContent = t(key)));
   if (pick) btn.href = pick.href;
+  const openMacNote = () => { const d = $(".mac-note"); if (d) d.open = true; };
+  $$('.dl[data-os^="mac"]').forEach((a) => a.addEventListener("click", openMacNote));
+  if (os.startsWith("mac")) btn.addEventListener("click", openMacNote);
 })();
 
 $$("[data-copy]").forEach((b) =>
