@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Knov — run a team of AI agents, without a terminal</title>
+<meta name="description" content="Knov is a desktop app for Windows and macOS. Give Claude Code and Codex work in many folders at once, approve their requests in one inbox, and undo anything.">
+<meta property="og:title" content="Knov — run a team of AI agents, without a terminal">
+<meta property="og:description" content="Many folders, many AI agents, one calm screen. For Windows and macOS.">
+<meta property="og:image" content="assets/logo-512.png">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+<link rel="icon" href="assets/knov-logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#main">
+  Skip to content
+</a>
+
+<header class="nav">
+  <a class="brand" href="#top" aria-label="Knov home">
+    <img src="assets/knov-logo.svg" alt="" width="28" height="28">
+    <span>Knov</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#parallel">How it works</a>
+    <a href="#undo">Safety</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <div class="nav-end">
+    <a class="btn btn-small" href="#download">Download</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" id="top">
+  <div class="hero-copy">
+    <h1>
+      A whole team of AI agents.<br>Not a wall of terminals.
+    </h1>
+    <p class="lede">
+      Knov lets anyone hand work to Claude Code and Codex in many folders at once. Every question and permission request lands in one inbox, and every change can be undone.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" id="hero-download" href="#download">
+        <span class="os-label">Download for Windows</span>
+      </a>
+      <a class="btn btn-ghost" id="hero-other" href="#download">
+        macOS and other versions
+      </a>
+    </div>
+    <p class="fineprint">
+      Free. Works with your Claude or ChatGPT account. No code, no terminal.
+    </p>
+  </div>
+  <figure class="demo" aria-label="Interactive Knov demo">
+    <div class="win">
+      <div class="win-bar">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="win-title"><img src="assets/knov-logo.svg" alt="" width="14" height="14"> Knov</span>
+      </div>
+      <div class="win-body">
+        <aside class="d-folders" aria-label="Folders">
+          <p class="d-head">Folders</p>
+          <ul id="d-folder-list"></ul>
+        </aside>
+        <div class="d-center">
+          <form class="d-composer" id="d-composer">
+            <label for="d-ask" class="sr">What should the AI do?</label>
+            <input id="d-ask" autocomplete="off">
+            <button type="submit" class="btn btn-primary btn-small" id="d-start">
+              Start in 3 folders
+            </button>
+          </form>
+          <div class="d-tasks" id="d-tasks"></div>
+        </div>
+        <aside class="d-inbox" aria-label="Inbox" aria-live="polite">
+          <p class="d-head">Inbox <b class="badge" id="d-badge" hidden>0</b></p>
+          <div id="d-inbox-list">
+            <p class="d-empty" id="d-empty">Nothing is waiting for you.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+    <figcaption id="d-hint" class="hint">
+      Press Start — three AI agents get to work at the same time.
+    </figcaption>
+  </figure>
+</section>
+<section class="band" id="parallel">
+  <div class="band-copy">
+    <h2>
+      Six projects at once, without six black windows.
+    </h2>
+    <p>
+      Running several AI agents today means juggling terminal windows full of logs, guessing which one is stuck. Knov shows each job as a calm card with one status dot.
+    </p>
+    <div class="toggle" role="group" aria-label="Compare">
+      <button type="button" class="tog" data-view="before" aria-pressed="true">Terminals</button>
+      <button type="button" class="tog" data-view="after" aria-pressed="false">Knov</button>
+    </div>
+  </div>
+  <div class="compare" id="compare" data-view="before" aria-live="polite">
+    <div class="term-grid" id="term-grid" aria-hidden="true"></div>
+    <div class="board" id="board"></div>
+  </div>
+</section>
+<section class="plain">
+  <h2>
+    It speaks your language, not code.
+  </h2>
+  <p class="section-lede">
+    Agents describe their work in tool calls and shell commands. Knov turns each one into a sentence before it reaches you. Tap a line to see what the agent actually sent.
+  </p>
+  <ol class="translate" id="translate"></ol>
+</section>
+<section class="undo" id="undo">
+  <div class="undo-copy">
+    <h2>
+      Didn't like it? Undo the whole request.
+    </h2>
+    <p>
+      Knov saves your folder before every request. One click puts edited files back. Files the AI created afterwards aren't deleted — they move to a safe box.
+    </p>
+    <button type="button" class="btn btn-primary" id="undo-btn">Undo this request</button>
+    <p class="undo-status" id="undo-status" aria-live="polite"></p>
+  </div>
+  <div class="doc" id="doc">
+    <div class="doc-tabs" aria-hidden="true">
+      <span class="doc-tab is-on">autumn-trip.md</span>
+      <span class="doc-tab doc-new" id="doc-new">summary.md</span>
+    </div>
+    <pre class="doc-body" id="doc-body"></pre>
+    <div class="safebox" id="safebox" aria-hidden="true">
+      Safe box
+      <span class="safe-file" id="safe-file">summary.md</span>
+    </div>
+  </div>
+</section>
+<section class="modes">
+  <h2>
+    You decide how much it asks.
+  </h2>
+  <div class="mode-pick" role="radiogroup" aria-label="Permission mode">
+    <button type="button" role="radio" class="mode" data-mode="ask" aria-checked="true">
+      <strong>Ask me first</strong>
+      Before editing files or running programs, it waits for your OK.
+    </button>
+    <button type="button" role="radio" class="mode" data-mode="all" aria-checked="false">
+      <strong>Allow everything</strong>
+      It works straight through. Undo is still there.
+    </button>
+  </div>
+  <ol class="timeline" id="timeline" aria-live="polite"></ol>
+</section>
+<section class="setup">
+  <h2>
+    From download to first result in three steps.
+  </h2>
+  <ol class="steps">
+    <li>
+      <h3>Install Knov</h3>
+      <p>Double-click the installer. No admin rights needed on Windows.</p>
+    </li>
+    <li>
+      <h3>Let Knov set up the AI</h3>
+      <p>One button installs Claude Code or Codex, then you sign in with your existing account.</p>
+    </li>
+    <li>
+      <h3>Pick a folder and ask</h3>
+      <p>“Fix the spelling in my blog posts.” Then pick the next folder and ask again — they run side by side.</p>
+    </li>
+  </ol>
+</section>
+<section class="download" id="download">
+  <h2>Download Knov</h2>
+  <p class="section-lede">
+    Version <b data-version>0.4.3</b>. Free. English and Korean.
+  </p>
+  <div class="dl-grid">
+    <a class="dl" data-os="win" href="#" data-asset="Knov-windows-setup.exe">
+      <span class="dl-os">Windows</span>
+      <span class="dl-meta">Windows 10 and 11 · installer</span>
+      <span class="dl-file">Knov-windows-setup.exe</span>
+    </a>
+    <a class="dl" data-os="mac-arm" href="#" data-asset="Knov-mac-apple-silicon.zip">
+      <span class="dl-os">macOS <small>Apple silicon</small></span>
+      <span class="dl-meta">M1 and later · preview</span>
+      <span class="dl-file">Knov-mac-apple-silicon.zip</span>
+    </a>
+    <a class="dl" data-os="mac-intel" href="#" data-asset="Knov-mac-intel.zip">
+      <span class="dl-os">macOS <small>Intel</small></span>
+      <span class="dl-meta">Intel Macs · preview</span>
+      <span class="dl-file">Knov-mac-intel.zip</span>
+    </a>
+  </div>
+  <details class="mac-note">
+    <summary>Opening Knov on a Mac for the first time</summary>
+    <p>
+      The Mac version isn't signed by Apple yet, so macOS blocks it the first time. Unzip it, drag Knov into Applications, then open it once with Control-click → Open. If macOS says the app is damaged, open Terminal, paste the line below and press Return:
+    </p>
+    <div class="copy-line"><code id="xattr">xattr -dr com.apple.quarantine /Applications/Knov.app</code><button type="button" class="btn btn-small btn-ghost" data-copy="xattr">Copy</button></div>
+  </details>
+  <p class="needs">
+    You'll also need a Claude (Pro or Max) or ChatGPT (Plus or higher) account. Knov installs the AI programs for you.
+  </p>
+</section>
+<section class="faq" id="faq">
+  <h2>Questions</h2>
+  <details>
+    <summary>Do I need to know how to code?</summary>
+    <p>No. You write requests the way you'd ask a person, and approve or decline with buttons. Knov never shows you a terminal.</p>
+  </details>
+  <details>
+    <summary>Is Knov free?</summary>
+    <p>Yes. The AI itself runs on your own Claude or ChatGPT subscription, so its usage limits apply.</p>
+  </details>
+  <details>
+    <summary>Where do my files go?</summary>
+    <p>Knov runs on your computer and keeps its records there. The AI agents read the files they work on and send that content to their provider (Anthropic or OpenAI), just as they do when you use them directly.</p>
+  </details>
+  <details>
+    <summary>What if the AI breaks something?</summary>
+    <p>Undo the request. Knov puts the folder's files back the way they were and moves anything new to a safe box instead of deleting it.</p>
+  </details>
+  <details>
+    <summary>Which AI agents does it support?</summary>
+    <p>Claude Code (Anthropic) and Codex (OpenAI). You can use both, side by side.</p>
+  </details>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="brand"><img src="assets/knov-logo.svg" alt="" width="22" height="22"><span>Knov</span></div>
+  <p>
+    Knov isn't affiliated with Anthropic or OpenAI. Claude and Codex are trademarks of their owners.
+  </p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
