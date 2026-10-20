@@ -14,8 +14,9 @@
   --done: #2E9C62;
   --night: #10123A;
 
-  --display: "Bricolage Grotesque", system-ui, sans-serif;
-  --body: "Instrument Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --cjk: "Apple SD Gothic Neo", "Malgun Gothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC";
+  --display: "Bricolage Grotesque", system-ui, var(--cjk), sans-serif;
+  --body: "Instrument Sans", -apple-system, "Segoe UI", system-ui, var(--cjk), sans-serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
 
   --step--1: 0.875rem;
@@ -77,6 +78,13 @@ a { color: inherit; }
 .nav-links a { text-decoration: none; color: var(--ink-soft); font-size: var(--step--1); }
 .nav-links a:hover { color: var(--ink); }
 .nav-end { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.lang-pick { position: relative; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 999px; padding: 0 10px; height: 34px; }
+.lang-pick:hover { color: var(--ink); border-color: var(--ink-faint); }
+.lang-pick:focus-within { outline: 2px solid var(--crystal); outline-offset: 2px; }
+.lang-pick select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font: 600 .85rem/1 var(--body); color: var(--ink); padding: 0 2px; cursor: pointer; }
+.lang-pick select:focus { outline: none; }
+:lang(ko) h1, :lang(ko) h2, :lang(ko) h3, :lang(ko) p, :lang(ko) li { word-break: keep-all; }
+:lang(ko) h1, :lang(ko) h2, :lang(ja) h1, :lang(ja) h2, :lang(zh-Hans) h1, :lang(zh-Hans) h2 { letter-spacing: -0.02em; line-height: 1.2; }
 
 .hero { max-width: var(--wrap); margin: 0 auto; padding: 56px 24px 96px; }
 .hero-copy { max-width: 1040px; }

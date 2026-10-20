@@ -5,12 +5,56 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? Math.min(ms, 120) : ms));
+
+let lang = "en";
+const t = (key) => (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key;
+const onLang = [];
+
+function applyStatic() {
+  $$("[data-i18n]").forEach((el) => (el.textContent = t(el.dataset.i18n)));
+  $$("[data-i18n-html]").forEach((el) => {
+    el.innerHTML = t(el.dataset.i18nHtml).replace("{v}", el.dataset.version || "");
+  });
+  $$("[data-i18n-aria]").forEach((el) => el.setAttribute("aria-label", t(el.dataset.i18nAria)));
+  $$("[data-i18n-content]").forEach((el) => el.setAttribute("content", t(el.dataset.i18nContent)));
+}
+
+function setLang(next) {
+  lang = I18N[next] ? next : "en";
+  document.documentElement.lang = lang === "zh" ? "zh-Hans" : lang;
+  $("#lang").value = lang;
+  try { localStorage.setItem("knov-lang", lang); } catch (_) {}
+  applyStatic();
+  onLang.forEach((fn) => fn());
+}
+
+function guessLang() {
+  let saved = null;
+  try { saved = localStorage.getItem("knov-lang"); } catch (_) {}
+  if (saved && I18N[saved]) return saved;
+  for (const l of navigator.languages || [navigator.language || "en"]) {
+    const code = l.toLowerCase().slice(0, 2);
+    if (I18N[code]) return code;
+  }
+  return "en";
+}
+
+(function initLangPicker() {
+  const select = $("#lang");
+  for (const [code, name] of LANGS) {
+    const o = document.createElement("option");
+    o.value = code;
+    o.textContent = name;
+    o.lang = code;
+    select.append(o);
+  }
+  select.addEventListener("change", () => setLang(select.value));
+})();
+
 function detectOS() {
   const ua = navigator.userAgent;
   if (/Windows/i.test(ua)) return "win";
-  if (/Macintosh|Mac OS X/i.test(ua)) {
-    return "mac-arm";
-  }
+  if (/Macintosh|Mac OS X/i.test(ua)) return "mac-arm";
   return "other";
 }
 const os = detectOS();
@@ -21,71 +65,29 @@ $$(".dl").forEach((a) => {
 (function heroButton() {
   const btn = $("#hero-download");
   const pick = os === "other" ? null : $(`.dl[data-os="${os}"]`);
-  const render = () => {
-    const label = $(".os-label", btn);
-    if (os === "win") label.textContent = "Download for Windows";
-    else if (os.startsWith("mac")) label.textContent = "Download for Mac";
-    else label.textContent = "Download Knov";
-  };
-  render();
+  const key = os === "win" ? "hero.dl.win" : os.startsWith("mac") ? "hero.dl.mac" : "hero.dl.any";
+  onLang.push(() => ($(".os-label", btn).textContent = t(key)));
   if (pick) btn.href = pick.href;
 })();
+
 $$("[data-copy]").forEach((b) =>
   b.addEventListener("click", async () => {
     const text = $("#" + b.dataset.copy).textContent;
     try { await navigator.clipboard.writeText(text); } catch (_) {}
-    const original = b.textContent;
-    b.textContent = "Copied";
-    setTimeout(() => (b.textContent = original), 1500);
+    b.textContent = t("copied");
+    setTimeout(() => (b.textContent = t("copy")), 1500);
   })
 );
-const FOLDERS = [
-  {
-    id: "blog",
-    name: () => "Blog posts",
-    agent: "Claude",
-    ask: () => "Fix the spelling in all 10 posts",
-    script: [
-      ["did", () => "Read 10 posts"],
-      ["did", () => "Edited 'autumn-trip.md'"],
-      ["did", () => "Edited 'first-camping.md'"],
-      ["ask", () => "Wants to edit 'jeju-cafes.md'"],
-      ["did", () => "Edited 'jeju-cafes.md'"],
-      ["done", () => "Fixed 14 typos across 10 posts. Your tone is untouched."],
-    ],
-  },
-  {
-    id: "budget",
-    name: () => "Budget",
-    agent: "Codex",
-    ask: () => "Total October spending by category",
-    script: [
-      ["did", () => "Read 'october-card.csv'"],
-      ["did", () => "Grouped 182 payments"],
-      ["ask", () => "Wants to create 'october-summary.xlsx'"],
-      ["did", () => "Created 'october-summary.xlsx'"],
-      ["done", () => "Food $412 · Transport $98 · Shopping $266"],
-    ],
-  },
-  {
-    id: "photos",
-    name: () => "Photos",
-    agent: "Claude",
-    ask: () => "Sort photos into folders by date",
-    script: [
-      ["did", () => "Looked around the folder"],
-      ["did", () => "Created 12 date folders"],
-      ["did", () => "Moved 214 photos"],
-      ["done", () => "214 photos are now in 12 folders, from 2026-01 to 2026-12."],
-    ],
-  },
-];
 
-const demo = {
-  runId: 0,
-  state: {},
-  started: false,
-};
+const FOLDERS = [
+  { id: "blog", agent: "Claude", script: [["did", 1], ["did", 2], ["did", 3], ["ask", 4], ["did", 5], ["done", 6]] },
+  { id: "budget", agent: "Codex", script: [["did", 1], ["did", 2], ["ask", 3], ["did", 4], ["done", 5]] },
+  { id: "photos", agent: "Claude", script: [["did", 1], ["did", 2], ["did", 3], ["done", 4]] },
+];
+const fname = (f) => t(f.id + ".name");
+
+const demo = { runId: 0, state: {}, started: false };
+const dotClass = (phase) => ({ working: "working", waiting: "waiting", done: "done" }[phase] || "");
 
 function folderList() {
   const ul = $("#d-folder-list");
@@ -95,19 +97,9 @@ function folderList() {
     const li = document.createElement("li");
     li.className = s.phase === "working" || s.phase === "waiting" ? "is-busy" : "";
     li.innerHTML = `<span class="dot ${dotClass(s.phase)}"></span><span></span>`;
-    li.lastChild.textContent = f.name();
+    li.lastChild.textContent = fname(f);
     ul.append(li);
   }
-}
-const dotClass = (phase) => ({ working: "working", waiting: "waiting", done: "done" }[phase] || "");
-
-function phaseLabel(phase) {
-  return {
-    idle: "Not started",
-    working: "Working…",
-    waiting: "Waiting for your OK",
-    done: "Done",
-  }[phase];
 }
 
 function renderTasks() {
@@ -119,18 +111,18 @@ function renderTasks() {
     card.className = "task" + (s && s.phase === "waiting" ? " is-waiting" : "");
     if (!s) {
       card.innerHTML = `<div class="task-title"><span class="dot"></span><span></span></div><p class="task-empty"></p>`;
-      card.querySelector(".task-title span:last-child").textContent = f.name();
-      card.querySelector(".task-empty").textContent = "Waiting for a request";
+      card.querySelector(".task-title span:last-child").textContent = fname(f);
+      card.querySelector(".task-empty").textContent = t("demo.waitingReq");
     } else {
       card.innerHTML = `<div class="task-title"><span class="dot ${dotClass(s.phase)}"></span><span></span></div>
         <div class="task-sub"></div><ul class="task-lines"></ul>`;
-      card.querySelector(".task-title span:last-child").textContent = s.title;
-      card.querySelector(".task-sub").textContent = `${f.name()} · ${f.agent} · ${phaseLabel(s.phase)}`;
+      card.querySelector(".task-title span:last-child").textContent = s.typed || t(f.id + ".ask");
+      card.querySelector(".task-sub").textContent = `${fname(f)} · ${f.agent} · ${t("phase." + s.phase)}`;
       const ul = card.querySelector(".task-lines");
       for (const line of s.lines) {
         const li = document.createElement("li");
         if (line.kind === "done") li.className = "said";
-        li.textContent = line.text();
+        li.textContent = t(line.key);
         ul.append(li);
       }
     }
@@ -149,7 +141,7 @@ function renderInbox() {
   if (waiting.length === 0) {
     const p = document.createElement("p");
     p.className = "d-empty";
-    p.textContent = "Nothing is waiting for you.";
+    p.textContent = t("demo.empty");
     list.append(p);
     return;
   }
@@ -159,22 +151,16 @@ function renderInbox() {
     card.className = "ask";
     card.innerHTML = `<div class="ask-from"></div><div class="ask-what"></div>
       <div class="ask-row"><button type="button" class="allow"></button><button type="button" class="deny"></button></div>`;
-    card.querySelector(".ask-from").textContent = `${f.name()} · ${f.agent}`;
-    card.querySelector(".ask-what").textContent = s.pending();
+    card.querySelector(".ask-from").textContent = `${fname(f)} · ${f.agent}`;
+    card.querySelector(".ask-what").textContent = t(s.pending);
     const allow = card.querySelector(".allow");
     const deny = card.querySelector(".deny");
-    allow.textContent = "Allow";
-    deny.textContent = "Deny";
+    allow.textContent = t("demo.allow");
+    deny.textContent = t("demo.deny");
     allow.addEventListener("click", () => s.resume(true));
     deny.addEventListener("click", () => s.resume(false));
     list.append(card);
   }
-}
-
-function setHint(text, yours = false) {
-  const hint = $("#d-hint");
-  hint.classList.toggle("is-yours", yours);
-  hint.textContent = text;
 }
 
 function refresh() {
@@ -182,38 +168,38 @@ function refresh() {
   renderInbox();
   const anyWaiting = FOLDERS.some((f) => demo.state[f.id] && demo.state[f.id].phase === "waiting");
   const allDone = demo.started && FOLDERS.every((f) => demo.state[f.id] && demo.state[f.id].phase === "done");
-  if (anyWaiting) setHint("Your turn: an agent is waiting for your OK in the inbox.", true);
-  else if (allDone) setHint("All three finished while you approved two things. Press Start to run it again.");
-  else if (demo.started) setHint("Three agents are working at the same time, each in its own folder.");
+  const hint = $("#d-hint");
+  const key = anyWaiting ? "hint.turn" : allDone ? "hint.done" : demo.started ? "hint.working" : "hint.start";
+  hint.classList.toggle("is-yours", anyWaiting);
+  hint.textContent = t(key);
 }
 
-async function runFolder(f, runId, typedTitle) {
-  const s = { phase: "working", lines: [], title: typedTitle || f.ask(), resume: null, pending: null };
+async function runFolder(f, runId, typed) {
+  const s = { phase: "working", lines: [], typed, resume: null, pending: null };
   demo.state[f.id] = s;
   refresh();
   await sleep(500 + Math.random() * 600);
-  for (const [kind, text] of f.script) {
+  for (const [kind, n] of f.script) {
     if (runId !== demo.runId) return;
+    const key = `${f.id}.${n}`;
     if (kind === "ask") {
       s.phase = "waiting";
-      s.pending = text;
+      s.pending = key;
       refresh();
       const allowed = await new Promise((resolve) => (s.resume = resolve));
       if (runId !== demo.runId) return;
       s.phase = "working";
-      s.lines.push({ kind: "did", text: allowed ? () => "You allowed it" : () => "You declined — it skipped that step" });
+      s.lines.push({ kind: "did", key: allowed ? "demo.allowed" : "demo.declined" });
       refresh();
       await sleep(700);
-      if (!allowed) continue;
       continue;
     }
+    s.lines.push({ kind, key });
     if (kind === "done") {
       s.phase = "done";
-      s.lines.push({ kind, text });
       refresh();
       return;
     }
-    s.lines.push({ kind, text });
     refresh();
     await sleep(900 + Math.random() * 900);
   }
@@ -229,18 +215,16 @@ function startDemo(typed) {
 
 (function initDemo() {
   const input = $("#d-ask");
-  const updatePlaceholder = () => (input.placeholder = "Ask all three folders, or type your own request for the first one");
-  updatePlaceholder();
+  onLang.push(() => { input.placeholder = t("demo.placeholder"); refresh(); });
   $("#d-composer").addEventListener("submit", (e) => {
     e.preventDefault();
     clearTimeout(demo.auto);
     startDemo(input.value.trim() || null);
     input.value = "";
   });
-  renderTasks();
-  renderInbox();
   demo.auto = setTimeout(() => { if (!demo.started) startDemo(null); }, 1600);
 })();
+
 const TERMINAL_NOISE = [
   "⏺ Read(src/posts/autumn-trip.md)", "  ⎿  Read 182 lines", "⏺ Bash(npm run lint --fix)", "  ⎿  > eslint . --ext .ts,.tsx",
   "✻ Thinking… (esc to interrupt)", "⏺ Update(src/components/Card.tsx)", "  ⎿  Updated with 3 additions and 1 removal",
@@ -249,57 +233,55 @@ const TERMINAL_NOISE = [
 ];
 const STUCK = "Do you want to proceed?\n❯ 1. Yes\n  2. No, and tell Claude what to do differently (esc)";
 const BOARD = [
-  ["done", () => "Blog spelling", () => "Done · 2 min ago"],
-  ["waiting", () => "October budget", () => "Waiting for your OK"],
-  ["working", () => "Photo sorting", () => "Working…"],
-  ["working", () => "Shop product page", () => "Working…"],
-  ["done", () => "Resume update", () => "Done · 12 min ago"],
-  ["working", () => "Class handouts", () => "Working…"],
+  ["done", "board.1", "board.ago2"],
+  ["waiting", "board.2", "phase.waiting"],
+  ["working", "board.3", "phase.working"],
+  ["working", "board.4", "phase.working"],
+  ["done", "board.5", "board.ago12"],
+  ["working", "board.6", "phase.working"],
 ];
 
 (function initCompare() {
   const grid = $("#term-grid");
   const terms = [];
   for (let i = 0; i < 6; i++) {
-    const t = document.createElement("div");
-    t.className = "term";
+    const el = document.createElement("div");
+    el.className = "term";
     const pre = document.createElement("pre");
-    t.append(pre);
-    grid.append(t);
+    el.append(pre);
+    grid.append(el);
     terms.push({ pre, lines: [] });
   }
   terms[1].stuck = true;
   const tick = () => {
-    terms.forEach((t, i) => {
-      if (t.stuck && t.lines.length > 5) {
-        t.pre.innerHTML = "";
-        t.pre.textContent = t.lines.slice(-6).join("\n") + "\n";
+    terms.forEach((term) => {
+      if (term.stuck && term.lines.length > 5) {
+        term.pre.textContent = term.lines.slice(-6).join("\n") + "\n";
         const s = document.createElement("span");
         s.className = "stuck";
         s.textContent = STUCK;
-        t.pre.append(s);
+        term.pre.append(s);
         return;
       }
-      if (Math.random() < 0.6) t.lines.push(TERMINAL_NOISE[(Math.random() * TERMINAL_NOISE.length) | 0]);
-      t.pre.textContent = t.lines.slice(-14).join("\n");
+      if (Math.random() < 0.6) term.lines.push(TERMINAL_NOISE[(Math.random() * TERMINAL_NOISE.length) | 0]);
+      term.pre.textContent = term.lines.slice(-14).join("\n");
     });
   };
   for (let i = 0; i < 8; i++) tick();
   if (!reduceMotion) setInterval(tick, 700);
 
   const board = $("#board");
-  const renderBoard = () => {
+  onLang.push(() => {
     board.innerHTML = "";
     for (const [phase, title, sub] of BOARD) {
       const c = document.createElement("div");
       c.className = "card";
       c.innerHTML = `<span class="dot ${phase}"></span><b></b><span></span>`;
-      c.querySelector("b").textContent = title();
-      c.querySelector("span:last-child").textContent = sub();
+      c.querySelector("b").textContent = t(title);
+      c.querySelector("span:last-child").textContent = t(sub);
       board.append(c);
     }
-  };
-  renderBoard();
+  });
   $$(".tog").forEach((b) =>
     b.addEventListener("click", () => {
       $("#compare").dataset.view = b.dataset.view;
@@ -307,19 +289,16 @@ const BOARD = [
     })
   );
 })();
+
 const TRANSLATIONS = [
-  ["caution", () => "Wants to edit 'report.docx'",
-    '{"type":"control_request","request":{"subtype":"can_use_tool","tool_name":"Edit","input":{"file_path":"C:\\\\Users\\\\me\\\\Documents\\\\report.docx","old_string":"…"}}}'],
-  ["safe", () => "Read 'october-card.csv'",
-    '"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe" -Command \'Get-Content -Raw -LiteralPath october-card.csv\''],
-  ["danger", () => "Wants to delete 'old-drafts'",
-    '{"method":"item/commandExecution/requestApproval","params":{"command":"Remove-Item -Recurse -Force old-drafts"}}'],
-  ["caution", () => "Wants to search the web: “jeju cafe opening hours”",
-    '{"type":"tool_use","name":"WebSearch","input":{"query":"jeju cafe opening hours"}}'],
+  ["caution", "tr.1", '{"type":"control_request","request":{"subtype":"can_use_tool","tool_name":"Edit","input":{"file_path":"C:\\\\Users\\\\me\\\\Documents\\\\report.docx","old_string":"…"}}}'],
+  ["safe", "tr.2", '"C:\\\\WINDOWS\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe" -Command \'Get-Content -Raw -LiteralPath october-card.csv\''],
+  ["danger", "tr.3", '{"method":"item/commandExecution/requestApproval","params":{"command":"Remove-Item -Recurse -Force old-drafts"}}'],
+  ["caution", "tr.4", '{"type":"tool_use","name":"WebSearch","input":{"query":"jeju cafe opening hours"}}'],
 ];
 (function initTranslate() {
   const ol = $("#translate");
-  const render = () => {
+  onLang.push(() => {
     const open = new Set($$("li.is-raw", ol).map((li) => li.dataset.i));
     ol.innerHTML = "";
     TRANSLATIONS.forEach(([risk, human, raw], i) => {
@@ -328,74 +307,54 @@ const TRANSLATIONS = [
       if (open.has(String(i))) li.classList.add("is-raw");
       li.innerHTML = `<button type="button" aria-expanded="false"><span class="tr-human"><span class="risk ${risk}"></span><span></span></span><span class="tr-toggle"></span><code class="tr-raw"></code></button>`;
       const btn = li.querySelector("button");
-      li.querySelector(".tr-human span:last-child").textContent = human();
+      li.querySelector(".tr-human span:last-child").textContent = t(human);
       li.querySelector(".tr-raw").textContent = raw;
-      const label = () => (li.querySelector(".tr-toggle").textContent = li.classList.contains("is-raw") ? "Hide what the agent sent" : "Show what the agent sent");
+      const label = () => {
+        const isRaw = li.classList.contains("is-raw");
+        li.querySelector(".tr-toggle").textContent = t(isRaw ? "tr.hide" : "tr.show");
+        btn.setAttribute("aria-expanded", String(isRaw));
+      };
       label();
-      btn.setAttribute("aria-expanded", String(li.classList.contains("is-raw")));
-      btn.addEventListener("click", () => {
-        li.classList.toggle("is-raw");
-        btn.setAttribute("aria-expanded", String(li.classList.contains("is-raw")));
-        label();
-      });
+      btn.addEventListener("click", () => { li.classList.toggle("is-raw"); label(); });
       ol.append(li);
     });
-  };
-  render();
+  });
 })();
+
 (function initUndo() {
   const body = $("#doc-body");
   const doc = $("#doc");
   const btn = $("#undo-btn");
   const status = $("#undo-status");
   let restored = false;
-  const edited = () =>
-    `# Autumn trip\n\nWe left early <del>in the moring</del> <ins>in the morning</ins> and drove <del>along side</del> <ins>alongside</ins> the river.\nThe leaves had <del>allready</del> <ins>already</ins> turned red.\n\n<ins>## Summary\nA two-day drive through the valley in late October.</ins>`;
-  const original = () =>
-    `# Autumn trip\n\nWe left early in the moring and drove along side the river.\nThe leaves had allready turned red.`;
   const render = () => {
-    body.innerHTML = restored ? "" : edited();
-    if (restored) body.textContent = original();
+    if (restored) body.textContent = t("doc.original");
+    else body.innerHTML = t("doc.edited");
     doc.classList.toggle("is-restored", restored);
-    btn.textContent = restored
-      ? "Show the AI's version again"
-      : "Undo this request";
-    status.textContent = restored
-      ? "Restored 1 file and moved 1 new file to the safe box."
-      : "";
+    btn.textContent = t(restored ? "undo.again" : "undo.btn");
+    status.textContent = restored ? t("undo.status") : "";
   };
-  render();
+  onLang.push(render);
   btn.addEventListener("click", () => { restored = !restored; render(); });
 })();
+
 (function initModes() {
   const timeline = $("#timeline");
   let mode = "ask";
   let run = 0;
+  let seen = false;
   const STEPS = {
-    ask: [
-      ["", () => "Read 10 posts"],
-      ["wait", () => "Asks: edit 'autumn-trip.md'?"],
-      ["", () => "You allow it"],
-      ["wait", () => "Asks: run the spell checker?"],
-      ["", () => "You allow it"],
-      ["end", () => "Done — you approved 2 steps"],
-    ],
-    all: [
-      ["", () => "Read 10 posts"],
-      ["", () => "Edited 'autumn-trip.md'"],
-      ["", () => "Ran the spell checker"],
-      ["", () => "Edited 9 more posts"],
-      ["end", () => "Done — nothing to approve, undo still available"],
-    ],
+    ask: [["", "tl.read"], ["wait", "tl.askEdit"], ["", "tl.allow"], ["wait", "tl.askSpell"], ["", "tl.allow"], ["end", "tl.doneAsk"]],
+    all: [["", "tl.read"], ["", "tl.edited"], ["", "tl.ranSpell"], ["", "tl.edited9"], ["end", "tl.doneAll"]],
   };
   const play = async () => {
     const me = ++run;
     timeline.innerHTML = "";
-    for (const [kind, text] of STEPS[mode]) {
+    for (const [kind, key] of STEPS[mode]) {
       if (me !== run) return;
       const li = document.createElement("li");
       li.className = kind;
-      li.textContent = text();
+      li.textContent = t(key);
       timeline.append(li);
       await sleep(kind === "wait" ? 900 : 450);
     }
@@ -404,11 +363,15 @@ const TRANSLATIONS = [
     b.addEventListener("click", () => {
       mode = b.dataset.mode;
       $$(".mode").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+      seen = true;
       play();
     })
   );
+  onLang.push(() => { if (seen) play(); });
   const io = new IntersectionObserver((entries) => {
-    if (entries.some((e) => e.isIntersecting)) { play(); io.disconnect(); }
+    if (entries.some((e) => e.isIntersecting)) { seen = true; play(); io.disconnect(); }
   }, { threshold: 0.4 });
   io.observe(timeline);
 })();
+
+setLang(guessLang());
